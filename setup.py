@@ -14,7 +14,7 @@ def read_file(file_path):
     Returns:
         str: The file content.
     """
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         data = f.read()
     return data
 
