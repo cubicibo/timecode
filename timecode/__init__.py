@@ -22,7 +22,7 @@
 # THE SOFTWARE.
 
 __name__ = "timecode"
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 __description__ = "SMPTE Time Code Manipulation Library"
 __author__ = "Erkan Ozgur Yilmaz"
 __author_email__ = "eoyilmaz@gmail.com"
