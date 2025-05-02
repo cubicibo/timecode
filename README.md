@@ -40,6 +40,13 @@ Use the `frame_number` attribute if you want to get a 0 based frame number:
 assert tc4.frame_number == 0
 ```
 
+> [!NOTE]
+> A common misconception is that `00:00:00:00` should have 0 frames. This is wrong
+> because Timecode is a label given for each frame in a media, and it happens to be
+> using numbers which are seemingly incremented one after another. So, for a Timecode to
+> exist there should be a frame. and 00:00:00:00 is generally the label given to the
+> first frame.
+
 Frame rates 29.97 and 59.94 are always drop frame, and all the others are non drop
 frame.
 
