@@ -893,6 +893,20 @@ class Timecode:
         epsilon = 1e-10  # This is much smaller than 1/framerate for any reasonable framerate
         return time_value + epsilon
 
+    if sys.version_info >= (3, 9):
+        # Python 3.9+ supports math.nextafter, which we can use
+        # to shift the float by the smallest possible amount
+        @property
+        def float(self) -> float:
+            """Return the seconds as float.
+
+            Returns:
+                float: The seconds as float.
+            """
+            import math
+            time_value = float(self.frames) / float(self._int_framerate)
+            return math.nextafter(time_value, math.inf)
+
 
 class TimecodeError(Exception):
     """Raised when an error occurred in timecode calculation."""
