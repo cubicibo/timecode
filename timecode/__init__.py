@@ -196,6 +196,10 @@ class Timecode(object):
             self._int_framerate = 60
             self.drop_frame = not self.force_non_drop_frame
             self._ntsc_framerate = True
+        elif framerate == "119.88":
+            self._int_framerate = 120
+            self.drop_frame = not self.force_non_drop_frame
+            self._ntsc_framerate = True
         elif any(map(lambda x: framerate.startswith(x), ["23.976", "23.98"])):  # type: ignore
             self._int_framerate = 24
             self._ntsc_framerate = True
