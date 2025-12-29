@@ -1,3 +1,0 @@
-python -m build
-twine check dist/timecode-*.tar.gz
-twine upload dist/timecode-*.tar.gz

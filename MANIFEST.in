@@ -1,14 +1,6 @@
-include *.txt *.ini *.cfg *.rst *.py
-
-include CHANGELOG
-include TODO
-include README
-include INSTALL
-include MANIFEST.in
+include CHANGELOG.rst
 include LICENSE
-include timecode.py
-recursive-include docs *
-recursive-include tests *
-
-prune docs/build
-prune docs/source/generated
+include MANIFEST.in
+include README.md
+global-exclude __pycache__
+global-exclude *.py[cod]

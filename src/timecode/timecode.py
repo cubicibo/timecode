@@ -1,75 +1,61 @@
-#!-*- coding: utf-8 -*-
-# The MIT License (MIT)
-#
-# Copyright (c) 2014 Joshua Banton and PyTimeCode developers
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+"""Timecode class for handling timecode calculations."""
 
-__name__ = "timecode"
-__version__ = "1.4.1"
-__description__ = "SMPTE Time Code Manipulation Library"
-__author__ = "Erkan Ozgur Yilmaz"
-__author_email__ = "eoyilmaz@gmail.com"
-__url__ = "https://github.com/eoyilmaz/timecode"
+# Standard Library Imports
+from __future__ import annotations
 
-
-from fractions import Fraction
 import sys
-from typing import Optional, Tuple, Union, overload
+from contextlib import suppress
+from typing import TYPE_CHECKING, overload
 
-try:
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+with suppress(ImportError):
     from typing import Literal
-except ImportError:
-    pass
 
 
-class Timecode(object):
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from fractions import Fraction
+
+
+class Timecode:
     """The main timecode class.
 
-    Does all the calculation over frames, so the main data it holds is frames, then when
-    required it converts the frames to a timecode by using the frame rate setting.
+    Does all the calculation over frames, so the main data it holds is frames,
+    then when required it converts the frames to a timecode by using the frame
+    rate setting.
 
     Args:
-        framerate (Union[str, int, float, Fraction]): The frame rate of the Timecode
-            instance. If a str is given it should be one of ['23.976', '23.98', '24',
-            '25', '29.97', '30', '50', '59.94', '60', 'NUMERATOR/DENOMINATOR', ms']
-            where "ms" equals to 1000 fps. Otherwise, any integer or Fractional value is
-            accepted. Can not be skipped. Setting the framerate will automatically set
-            the :attr:`.drop_frame` attribute to correct value.
-        start_timecode (Union[None, str]): The start timecode. Use this to be able to
-            set the timecode of this Timecode instance. It can be skipped and then the
-            frames attribute will define the timecode, and if it is also skipped then
-            the start_second attribute will define the start timecode, and if
-            start_seconds is also skipped then the default value of '00:00:00:00' will
-            be used. When using 'ms' frame rate, timecodes like '00:11:01.040' use
-            '.040' as frame number. When used with other frame rates, '.040' represents
-            a fraction of a second. So '00:00:00.040' at 25fps is 1 frame.
-        start_seconds (Union[int, float]): A float or integer value showing the seconds.
-        frames (int): Timecode objects can be initialized with an integer number showing
-            the total frames.
-        force_non_drop_frame (bool): If True, uses Non-Dropframe calculation for 29.97
-            or 59.94 only. Has no meaning for any other framerate. It is False by
-            default.
+        framerate (str | int | float | Fraction): The frame rate of the
+            Timecode instance. If a str is given it should be one of ['23.976',
+            '23.98', '24', '25', '29.97', '30', '50', '59.94', '60',
+            'NUMERATOR/DENOMINATOR', ms'] where "ms" equals to 1000 fps.
+            Otherwise, any integer or Fractional value is accepted. Can not be
+            skipped. Setting the framerate will automatically set the
+            :attr:`.drop_frame` attribute to correct value.
+        start_timecode (None | str): The start timecode. Use this to be able to
+            set the timecode of this Timecode instance. It can be skipped and
+            then the frames attribute will define the timecode, and if it is
+            also skipped then the start_second attribute will define the start
+            timecode, and if start_seconds is also skipped then the default
+            value of '00:00:00:00' will be used. When using 'ms' frame rate,
+            timecodes like '00:11:01.040' use '.040' as frame number. When used
+            with other frame rates, '.040' represents a fraction of a second.
+            So '00:00:00.040' at 25fps is 1 frame.
+        start_seconds (int | float): A float or integer value showing the
+            seconds.
+        frames (int): Timecode objects can be initialized with an integer
+            number showing the total frames.
+        force_non_drop_frame (bool): If True, uses Non-Dropframe calculation
+            for 29.97 or 59.94 only. Has no meaning for any other framerate. It
+            is False by default.
     """
 
     @staticmethod
-    def _is_ntsc_rate(fps: float) -> Tuple[bool, int]:
+    def _is_ntsc_rate(fps: float) -> tuple[bool, int]:
         """Check if framerate is NTSC (multiple of 24000/1001 or 30000/1001).
 
         NTSC rates follow the pattern: nominal_rate * 1000/1001
@@ -79,8 +65,8 @@ class Timecode(object):
             fps (float): The framerate to check.
 
         Returns:
-            tuple: (is_ntsc, int_framerate) where is_ntsc is True if this is an NTSC rate,
-                   and int_framerate is the rounded integer framerate.
+            tuple: (is_ntsc, int_framerate) where is_ntsc is True if this is an
+                NTSC rate, and int_framerate is the rounded integer framerate.
         """
         # Calculate what the integer framerate would be if this is NTSC
         int_fps = round(fps * 1001 / 1000)
@@ -95,38 +81,36 @@ class Timecode(object):
 
     def __init__(
         self,
-        framerate: Union[str, int, float, Fraction],
-        start_timecode: Optional[str] = None,
-        start_seconds: Optional[Union[int, float]] = None,
-        frames: Optional[int] = None,
+        framerate: str | float | Fraction,
+        start_timecode: None | str = None,
+        start_seconds: None | float = None,
+        frames: None | int = None,
         force_non_drop_frame: bool = False,
-    ):
-
+    ) -> None:
         self.force_non_drop_frame = force_non_drop_frame
 
         self.drop_frame = False
 
         self.ms_frame = False
         self.fraction_frame = False
-        self._int_framerate : Union[None, int] = None
-        self._framerate : Union[None, str, int, float, Fraction] = None
+        self._int_framerate: None | int = None
+        self._framerate: None | str | int | float | Fraction = None
         self.framerate = framerate  # type: ignore
-        self._frames : Union[None, int] = None
+        self._frames: None | int = None
 
         # attribute override order
         # start_timecode > frames > start_seconds
         if start_timecode:
             self.frames = self.tc_to_frames(start_timecode)
+        elif frames is not None:
+            self.frames = frames
+        elif start_seconds is not None:
+            if start_seconds == 0:
+                raise ValueError("``start_seconds`` argument can not be 0")
+            self.frames = self.float_to_tc(start_seconds)
         else:
-            if frames is not None:
-                self.frames = frames
-            elif start_seconds is not None:
-                if start_seconds == 0:
-                    raise ValueError("``start_seconds`` argument can not be 0")
-                self.frames = self.float_to_tc(start_seconds)
-            else:
-                # use default value of 00:00:00:00
-                self.frames = self.tc_to_frames("00:00:00:00")
+            # use default value of 00:00:00:00
+            self.frames = self.tc_to_frames("00:00:00:00")
 
     @property
     def frames(self) -> int:
@@ -148,15 +132,14 @@ class Timecode(object):
         # validate the frames value
         if not isinstance(frames, int):
             raise TypeError(
-                "%s.frames should be a positive integer bigger "
-                "than zero, not a %s"
-                % (self.__class__.__name__, frames.__class__.__name__)
+                f"{self.__class__.__name__}.frames should be a positive integer bigger "
+                f"than zero, not a {frames.__class__.__name__}"
             )
 
         if frames <= 0:
             raise ValueError(
-                "%s.frames should be a positive integer bigger "
-                "than zero, not %s" % (self.__class__.__name__, frames)
+                f"{self.__class__.__name__}.frames should be a positive "
+                f"integer bigger than zero, not {frames}"
             )
         self._frames = frames
 
@@ -170,12 +153,12 @@ class Timecode(object):
         return self._framerate  # type: ignore
 
     @framerate.setter
-    def framerate(self, framerate: Union[int, float, str, Tuple[int, int], Fraction]) -> None:
+    def framerate(self, framerate: float | str | tuple[int, int] | Fraction) -> None:
         """Set the framerate attribute.
 
         Args:
-            framerate (Union[int, float, str, tuple, Fraction]): Several different type
-                is accepted for this argument:
+            framerate (int | float | str | tuple[int, int] | Fraction): Several
+                different type is accepted for this argument:
 
                 int, float: It is directly used.
                 str: Is used for setting DF Timecodes and possible values are
@@ -188,8 +171,8 @@ class Timecode(object):
                     then Fraction is also accepted.
         """
         # Convert rational frame rate to float, defaults to None if not Fraction-like
-        numerator = getattr(framerate, 'numerator', None)
-        denominator = getattr(framerate, 'denominator', None)
+        numerator = getattr(framerate, "numerator", None)
+        denominator = getattr(framerate, "denominator", None)
 
         try:
             if "/" in framerate:  # type: ignore
@@ -250,12 +233,12 @@ class Timecode(object):
         """
         self.fraction_frame = state
 
-    def set_timecode(self, timecode: Union[str, "Timecode"]) -> None:
+    def set_timecode(self, timecode: str | Timecode) -> None:
         """Set the frames by using the given timecode.
 
         Args:
-            timecode (Union[str, Timecode]): Either a str representation of a Timecode
-                or a Timecode instance.
+            timecode (str | Timecode): Either a str representation of a
+                Timecode or a Timecode instance.
         """
         self.frames = self.tc_to_frames(timecode)
 
@@ -271,12 +254,12 @@ class Timecode(object):
         """
         return int(seconds * self._int_framerate)
 
-    def tc_to_frames(self, timecode: Union[str, "Timecode"]) -> int:
+    def tc_to_frames(self, timecode: str | Timecode) -> int:
         """Convert the given Timecode to frames.
 
         Args:
-            timecode (Union[str, Timecode]): Either a str representing a Timecode or a
-                Timecode instance.
+            timecode (str | Timecode): Either a str representing a Timecode or
+                a Timecode instance.
 
         Returns:
             int: The number of frames in the given Timecode.
@@ -294,17 +277,14 @@ class Timecode(object):
             if self.drop_frame:
                 timecode = ";".join(timecode.rsplit(":", 1))
 
-        if self.framerate != "frames":
-            ffps = float(self.framerate)
-        else:
-            ffps = float(self._int_framerate)
+        ffps = (
+            float(self.framerate)
+            if self.framerate != "frames"
+            else float(self._int_framerate)
+        )
 
-        if self.drop_frame:
-            # Number of drop frames is 6% of framerate rounded to nearest
-            # integer
-            drop_frames = int(round(ffps * 0.066666))
-        else:
-            drop_frames = 0
+        # Number of drop frames is 6% of framerate rounded to nearest integer
+        drop_frames = round(ffps * 0.066666) if self.drop_frame else 0
 
         # We don't need the exact framerate anymore, we just need it rounded to
         # nearest integer
@@ -324,7 +304,7 @@ class Timecode(object):
             self.fraction_frame = True
             fraction = timecode.rsplit(".", 1)[1]
 
-            frames = int(round(float("." + fraction) * ffps))
+            frames = round(float("." + fraction) * ffps)
 
         frame_number = (
             (hour_frames * hours)
@@ -335,11 +315,15 @@ class Timecode(object):
 
         return frame_number + 1  # frames
 
-    def frames_to_tc(self, frames: int, skip_rollover: bool = False) -> Tuple[int, int, int, Union[float, int]]:
+    def frames_to_tc(
+        self, frames: int, skip_rollover: bool = False
+    ) -> tuple[int, int, int, int | float]:
         """Convert frames back to timecode.
 
         Args:
             frames (int): Number of frames.
+            skip_rollover (bool): If True, the frame number will not rollover
+                after 24 hours.
 
         Returns:
             tuple: A tuple containing the hours, minutes, seconds and frames
@@ -348,16 +332,16 @@ class Timecode(object):
             # Number of frames to drop on the minute marks is the nearest
             # integer to 6% of the framerate
             ffps = float(self.framerate)
-            drop_frames = int(round(ffps * 0.066666))
+            drop_frames = round(ffps * 0.066666)
         else:
             ffps = float(self._int_framerate)
             drop_frames = 0
 
         # Number of frames per ten minutes
-        frames_per_10_minutes = int(round(ffps * 60 * 10))
+        frames_per_10_minutes = round(ffps * 60 * 10)
 
         # Number of frames in a day - timecode rolls over after 24 hours
-        frames_per_24_hours = int(round(ffps * 60 * 60 * 24))
+        frames_per_24_hours = round(ffps * 60 * 60 * 24)
 
         # Number of frames per minute is the round of the framerate * 60 minus
         # the number of dropped frames
@@ -382,17 +366,17 @@ class Timecode(object):
 
         ifps = self._int_framerate
 
-        frs: Union[int, float] = frame_number % ifps
+        frs: int | float = frame_number % ifps
         if self.fraction_frame:
             frs = round(frs / float(ifps), 3)
 
         secs = int((frame_number // ifps) % 60)
         mins = int(((frame_number // ifps) // 60) % 60)
-        hrs = int((((frame_number // ifps) // 60) // 60))
+        hrs = int(((frame_number // ifps) // 60) // 60)
 
         return hrs, mins, secs, frs
 
-    def tc_to_string(self, hrs: int, mins: int, secs: int, frs: Union[float, int]) -> str:
+    def tc_to_string(self, hrs: int, mins: int, secs: int, frs: float) -> str:
         """Return the string representation of a Timecode with given info.
 
         Args:
@@ -405,7 +389,7 @@ class Timecode(object):
             str: The string representation of this Timecode.ßß
         """
         if self.fraction_frame:
-            return "{hh:02d}:{mm:02d}:{ss:06.3f}".format(hh=hrs, mm=mins, ss=secs + frs)
+            return f"{hrs:02d}:{mins:02d}:{secs + frs:06.3f}"
 
         ff = "{:02d}"
         if self.ms_frame:
@@ -415,19 +399,17 @@ class Timecode(object):
             hrs, mins, secs, self.frame_delimiter, frs
         )
 
-    # to maintain python 3.7 compatibility (no literal type yet!)
-    # only use overload in 3.8+
-    if sys.version_info >= (3, 8):
-        @overload
-        def to_systemtime(self, as_float: Literal[True]) -> float:
-            pass
+    @overload
+    def to_systemtime(self, as_float: Literal[True]) -> float:
+        pass
 
-        @overload
-        def to_systemtime(self, as_float: Literal[False]) -> str:
-            pass
+    @overload
+    def to_systemtime(self, as_float: Literal[False]) -> str:
+        pass
 
-    def to_systemtime(self, as_float: bool = False) -> Union[str, float]:  # type:ignore
+    def to_systemtime(self, as_float: bool = False) -> str | float:  # type:ignore
         """Convert a Timecode to the video system timestamp.
+
         For NTSC rates, the video system time is not the wall-clock one.
 
         Args:
@@ -437,28 +419,28 @@ class Timecode(object):
             str: The "system time" timestamp of the Timecode.
         """
         if self.ms_frame:
-            return self.float-(1e-3) if as_float else str(self)
+            return self.float - (1e-3) if as_float else str(self)
 
         hh, mm, ss, ff = self.frames_to_tc(self.frames + 1, skip_rollover=True)
-        framerate = float(self.framerate) if self._ntsc_framerate else self._int_framerate
-        ms = ff/framerate
+        framerate = (
+            float(self.framerate) if self._ntsc_framerate else self._int_framerate
+        )
+        ms = ff / framerate
         if as_float:
-            return (hh*3600 + mm*60 + ss + ms)
-        return "{:02d}:{:02d}:{:02d}.{:03d}".format(hh, mm, ss, round(ms*1000))
+            return hh * 3600 + mm * 60 + ss + ms
+        return f"{hh:02d}:{mm:02d}:{ss:02d}.{round(ms * 1000):03d}"
 
-    # to maintain python 3.7 compatibility (no literal type yet!)
-    # only use typing.Literal in 3.8+
-    if sys.version_info >= (3, 8):
-        @overload  # type: ignore # noqa
-        def to_realtime(self, as_float: Literal[True]) -> float:
-            pass
+    @overload
+    def to_realtime(self, as_float: Literal[True]) -> float:
+        pass
 
-        @overload  # type: ignore # noqa
-        def to_realtime(self, as_float: Literal[False]) -> str:
-            pass
+    @overload
+    def to_realtime(self, as_float: Literal[False]) -> str:
+        pass
 
-    def to_realtime(self, as_float: bool = False) -> Union[str, float]:  # type:ignore
+    def to_realtime(self, as_float: bool = False) -> str | float:  # type:ignore
         """Convert a Timecode to a "real time" timestamp.
+
         Reference: SMPTE 12-1 §5.1.2
 
         Args:
@@ -467,11 +449,11 @@ class Timecode(object):
         Returns:
             str: The "real time" timestamp of the Timecode.
         """
-        #float property is in the video system time grid
+        # float property is in the video system time grid
         ts_float = self.float
 
         if self.ms_frame:
-            return ts_float-(1e-3) if as_float else str(self)
+            return ts_float - (1e-3) if as_float else str(self)
 
         # "int_framerate" frames is one second in NTSC time
         if self._ntsc_framerate:
@@ -479,16 +461,26 @@ class Timecode(object):
         if as_float:
             return ts_float
 
-        f_fmtdivmod = lambda x: (int(x[0]), x[1])
-        hh, ts_float = f_fmtdivmod(divmod(ts_float, 3600))
-        mm, ts_float = f_fmtdivmod(divmod(ts_float, 60))
-        ss, ts_float = f_fmtdivmod(divmod(ts_float, 1))
-        ms = round(ts_float*1000)
+        def f_fmt_divmod(x: tuple[int, float]) -> tuple[int, float]:
+            """Helper to format divmod results.
 
-        return "{:02d}:{:02d}:{:02d}.{:03d}".format(hh, mm, ss, ms)
+            Args:
+                x (tuple): The divmod result.
+
+            Returns:
+                tuple[int, float]: Formatted divmod result.
+            """
+            return (int(x[0]), x[1])
+
+        hh, ts_float = f_fmt_divmod(divmod(ts_float, 3600))
+        mm, ts_float = f_fmt_divmod(divmod(ts_float, 60))
+        ss, ts_float = f_fmt_divmod(divmod(ts_float, 1))
+        ms = round(ts_float * 1000)
+
+        return f"{hh:02d}:{mm:02d}:{ss:02d}.{ms:03d}"
 
     @classmethod
-    def parse_timecode(cls, timecode: Union[int, str]) -> Tuple[int, int, int, int]:
+    def parse_timecode(cls, timecode: int | str) -> tuple[int, int, int, int]:
         """Parse the given timecode string.
 
         This uses the frame separator do decide if this is a NDF, DF or a
@@ -499,7 +491,7 @@ class Timecode(object):
         Timecode.
 
         Args:
-            timecode (Union[int, str]): If an integer is given it is converted to hex
+            timecode (int | str): If an integer is given it is converted to hex
                 and the hours, minutes, seconds and frames are extracted from the hex
                 representation. If a str is given it should follow one of the SMPTE
                 timecode formats.ß
@@ -511,7 +503,7 @@ class Timecode(object):
         if isinstance(timecode, int):
             hex_repr = hex(timecode)
             # fix short string
-            hex_repr = "0x%s" % (hex_repr[2:].zfill(8))
+            hex_repr = f"0x{hex_repr[2:].zfill(8)}"
             hrs, mins, secs, frs = tuple(
                 map(int, [hex_repr[i : i + 2] for i in range(2, 10, 2)])
             )
@@ -536,13 +528,12 @@ class Timecode(object):
         if self.drop_frame:
             return ";"
 
-        elif self.ms_frame or self.fraction_frame:
+        if self.ms_frame or self.fraction_frame:
             return "."
 
-        else:
-            return ":"
+        return ":"
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Self]:
         """Yield and iterator.
 
         Yields:
@@ -550,7 +541,7 @@ class Timecode(object):
         """
         yield self
 
-    def next(self) -> "Timecode":
+    def next(self) -> Self:
         """Add one frame to this Timecode to go the next frame.
 
         Returns:
@@ -560,7 +551,7 @@ class Timecode(object):
         self.add_frames(1)
         return self
 
-    def back(self) -> "Timecode":
+    def back(self) -> Self:
         """Subtract one frame from this Timecode to go back one frame.
 
         Returns:
@@ -605,81 +596,81 @@ class Timecode(object):
         """
         self.frames = int(self.frames / frames)
 
-    def __eq__(self, other: Union[int, str, "Timecode", object]) -> bool:
+    def __eq__(self, other: int | str | Timecode | object) -> bool:
         """Override the equality operator.
 
         Args:
-            other (Union[int, str, Timecode]): Either and int representing the number of
-                frames, a str representing the start time of a Timecode with the same
-                frame rate of this one, or a Timecode to compare with the number of
-                frames.
+            other (int | str | Timecode): Either and int representing the
+                number of frames, a str representing the start time of a
+                Timecode with the same frame rate of this one, or a Timecode to
+                compare with the number of frames.
 
         Returns:
             bool: True if the other is equal to this Timecode instance.
         """
         if isinstance(other, Timecode):
             return self.framerate == other.framerate and self.frames == other.frames
-        elif isinstance(other, str):
+        if isinstance(other, str):
             new_tc = Timecode(self.framerate, other)
             return self.__eq__(new_tc)
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.frames == other
-        else:
-            return False
+        return False
 
-    def __ge__(self, other: Union[int, str, "Timecode", object]) -> bool:
+    def __ge__(self, other: int | str | Timecode | object) -> bool:
         """Override greater than or equal to operator.
 
         Args:
-            other (Union[int, str, Timecode]): Either and int representing the number of
-                frames, a str representing the start time of a Timecode with the same
-                frame rate of this one, or a Timecode to compare with the number of
-                frames.
+            other (int | str | Timecode): Either and int representing the
+                number of frames, a str representing the start time of a
+                Timecode with the same frame rate of this one, or a Timecode to
+                compare with the number of frames.
 
         Returns:
-            bool: True if the other is greater than or equal to this Timecode instance.
+            bool: True if the other is greater than or equal to this Timecode
+                instance.
         """
         if isinstance(other, Timecode):
             return self.framerate == other.framerate and self.frames >= other.frames
-        elif isinstance(other, str):
+        if isinstance(other, str):
             new_tc = Timecode(self.framerate, other)
             return self.frames >= new_tc.frames
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.frames >= other
-        else:
-            raise TypeError(
-                "'>=' not supported between instances of 'Timecode' and '{}'".format(other.__class__.__name__)
-            )
+        raise TypeError(
+            "'>=' not supported between instances of 'Timecode' and "
+            f"'{other.__class__.__name__}'"
+        )
 
-    def __gt__(self, other: Union[int, str, "Timecode"]) -> bool:
+    def __gt__(self, other: int | str | Timecode) -> bool:
         """Override greater than operator.
 
         Args:
-            other (Union[int, str, Timecode]): Either and int representing the number of
-                frames, a str representing the start time of a Timecode with the same
-                frame rate of this one, or a Timecode to compare with the number of
-                frames.
+            other (int | str, Timecode): Either and int representing the number
+                of frames, a str representing the start time of a Timecode with
+                the same frame rate of this one, or a Timecode to compare with
+                the number of frames.
 
         Returns:
             bool: True if the other is greater than this Timecode instance.
         """
         if isinstance(other, Timecode):
             return self.framerate == other.framerate and self.frames > other.frames
-        elif isinstance(other, str):
+        if isinstance(other, str):
             new_tc = Timecode(self.framerate, other)
             return self.frames > new_tc.frames
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.frames > other
-        else:
-            raise TypeError(
-                "'>' not supported between instances of 'Timecode' and '{}'".format(other.__class__.__name__)
-            )
+        raise TypeError(
+            "'>' not supported between instances of 'Timecode' and "
+            f"'{other.__class__.__name__}'"
+        )
 
-    def __le__(self, other: Union[int, str, "Timecode", object]) -> bool:
+    def __le__(self, other: int | str | Timecode | object) -> bool:
         """Override less or equal to operator.
 
         Args:
-            other (Union[int, str, Timecode]): Either and int representing the number of
+            other (int | str | Timecode): Either and int representing the number of
                 frames, a str representing the start time of a Timecode with the same
                 frame rate of this one, or a Timecode to compare with the number of
                 frames.
@@ -689,21 +680,21 @@ class Timecode(object):
         """
         if isinstance(other, Timecode):
             return self.framerate == other.framerate and self.frames <= other.frames
-        elif isinstance(other, str):
+        if isinstance(other, str):
             new_tc = Timecode(self.framerate, other)
             return self.frames <= new_tc.frames
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.frames <= other
-        else:
-            raise TypeError(
-                "'<' not supported between instances of 'Timecode' and '{}'".format(other.__class__.__name__)
-            )
+        raise TypeError(
+            "'<' not supported between instances of 'Timecode' and "
+            f"'{other.__class__.__name__}'"
+        )
 
-    def __lt__(self, other: Union[int, str, "Timecode"]) -> bool:
+    def __lt__(self, other: int | str | Timecode) -> bool:
         """Override less than operator.
 
         Args:
-            other (Union[int, str, Timecode]): Either and int representing the number of
+            other (int | str | Timecode): Either and int representing the number of
                 frames, a str representing the start time of a Timecode with the same
                 frame rate of this one, or a Timecode to compare with the number of
                 frames.
@@ -713,21 +704,21 @@ class Timecode(object):
         """
         if isinstance(other, Timecode):
             return self.framerate == other.framerate and self.frames < other.frames
-        elif isinstance(other, str):
+        if isinstance(other, str):
             new_tc = Timecode(self.framerate, other)
             return self.frames < new_tc.frames
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.frames < other
-        else:
-            raise TypeError(
-                "'<=' not supported between instances of 'Timecode' and '{}'".format(other.__class__.__name__)
-            )
+        raise TypeError(
+            "'<=' not supported between instances of 'Timecode' and "
+            f"'{other.__class__.__name__}'"
+        )
 
-    def __add__(self, other: Union["Timecode", int]) -> "Timecode":
+    def __add__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode with the given timecode or frames added to this one.
 
         Args:
-            other (Union[int, Timecode]): Either and int value or a Timecode in which
+            other (int | Timecode): Either and int value or a Timecode in which
                 the frames are used for the calculation.
 
         Raises:
@@ -746,16 +737,16 @@ class Timecode(object):
             tc.add_frames(other)
         else:
             raise TimecodeError(
-                "Type {} not supported for arithmetic.".format(other.__class__.__name__)
+                f"Type {other.__class__.__name__} not supported for arithmetic."
             )
 
         return tc
 
-    def __sub__(self, other: Union["Timecode", int]) -> "Timecode":
+    def __sub__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode instance with subtracted value.
 
         Args:
-            other (Union[int, Timecode]): The number to subtract, either an integer or
+            other (int | Timecode): The number to subtract, either an integer or
                 another Timecode in which the number of frames is subtracted.
 
         Raises:
@@ -770,17 +761,17 @@ class Timecode(object):
             subtracted_frames = self.frames - other
         else:
             raise TimecodeError(
-                "Type {} not supported for arithmetic.".format(other.__class__.__name__)
+                f"Type {other.__class__.__name__} not supported for arithmetic."
             )
         tc = Timecode(self.framerate, frames=abs(subtracted_frames))
         tc.drop_frame = self.drop_frame
         return tc
 
-    def __mul__(self, other: Union["Timecode", int]) -> "Timecode":
+    def __mul__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode instance with multiplied value.
 
         Args:
-            other (Union[int, Timecode]): The multiplier either an integer or another
+            other (int | Timecode): The multiplier either an integer or another
                 Timecode in which the number of frames is used as the multiplier.
 
         Raises:
@@ -795,17 +786,17 @@ class Timecode(object):
             multiplied_frames = self.frames * other
         else:
             raise TimecodeError(
-                "Type {} not supported for arithmetic.".format(other.__class__.__name__)
+                f"Type {other.__class__.__name__} not supported for arithmetic."
             )
         tc = Timecode(self.framerate, frames=multiplied_frames)
         tc.drop_frame = self.drop_frame
         return tc
 
-    def __div__(self, other: Union["Timecode", int]) -> "Timecode":
+    def __div__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode instance with divided value.
 
         Args:
-            other (Union[int, Timecode]): The denominator either an integer or another
+            other (int | Timecode): The denominator either an integer or another
                 Timecode in which the number of frames is used as the denominator.
 
         Raises:
@@ -820,16 +811,16 @@ class Timecode(object):
             div_frames = int(float(self.frames) / float(other))
         else:
             raise TimecodeError(
-                "Type {} not supported for arithmetic.".format(other.__class__.__name__)
+                f"Type {other.__class__.__name__} not supported for arithmetic."
             )
 
         return Timecode(self.framerate, frames=div_frames)
 
-    def __truediv__(self, other: Union["Timecode", int]) -> "Timecode":
+    def __truediv__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode instance with divided value.
 
         Args:
-            other (Union[int, Timecode]): The denominator either an integer or another
+            other (int | Timecode): The denominator either an integer or another
                 Timecode in which the number of frames is used as the denominator.
 
         Returns:
@@ -837,7 +828,7 @@ class Timecode(object):
         """
         return self.__div__(other)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return the string representation of this Timecode instance.
 
         Returns:
@@ -852,7 +843,7 @@ class Timecode(object):
         Returns:
             int: The hours part of the timecode.
         """
-        hrs, mins, secs, frs = self.frames_to_tc(self.frames)
+        hrs, _, _, _ = self.frames_to_tc(self.frames)
         return hrs
 
     @property
@@ -862,7 +853,7 @@ class Timecode(object):
         Returns:
             int: The minutes part of the timecode.
         """
-        hrs, mins, secs, frs = self.frames_to_tc(self.frames)
+        _, mins, _, _ = self.frames_to_tc(self.frames)
         return mins
 
     @property
@@ -872,17 +863,17 @@ class Timecode(object):
         Returns:
             int: The seconds part of the timecode.
         """
-        hrs, mins, secs, frs = self.frames_to_tc(self.frames)
+        _, _, secs, _ = self.frames_to_tc(self.frames)
         return secs
 
     @property
-    def frs(self) -> Union[float, int]:
+    def frs(self) -> int | float:
         """Return the frames part of the timecode.
 
         Returns:
             int: The frames part of the timecode.
         """
-        hrs, mins, secs, frs = self.frames_to_tc(self.frames)
+        _, _, _, frs = self.frames_to_tc(self.frames)
         return frs
 
     @property
