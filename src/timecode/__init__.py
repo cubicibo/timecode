@@ -1,0 +1,1 @@
+from timecode._version import __version__
