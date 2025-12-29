@@ -68,6 +68,31 @@ class Timecode(object):
             default.
     """
 
+    @staticmethod
+    def _is_ntsc_rate(fps: float) -> Tuple[bool, int]:
+        """Check if framerate is NTSC (multiple of 24000/1001 or 30000/1001).
+
+        NTSC rates follow the pattern: nominal_rate * 1000/1001
+        Examples: 23.976, 29.97, 47.952, 59.94, 71.928, 89.91, 95.904, 119.88
+
+        Args:
+            fps (float): The framerate to check.
+
+        Returns:
+            tuple: (is_ntsc, int_framerate) where is_ntsc is True if this is an NTSC rate,
+                   and int_framerate is the rounded integer framerate.
+        """
+        # Calculate what the integer framerate would be if this is NTSC
+        int_fps = round(fps * 1001 / 1000)
+
+        # Calculate what the NTSC rate would be for this integer framerate
+        expected_ntsc = int_fps * 1000 / 1001
+
+        # Check if the input matches expected NTSC rate (within tolerance)
+        is_ntsc = abs(fps - expected_ntsc) < 0.005
+
+        return is_ntsc, int_fps
+
     def __init__(
         self,
         framerate: Union[str, int, float, Fraction],
@@ -187,30 +212,31 @@ class Timecode(object):
 
         self._ntsc_framerate = False
 
-        # set the int_frame_rate
-        if framerate == "29.97":
-            self._int_framerate = 30
-            self.drop_frame = not self.force_non_drop_frame
-            self._ntsc_framerate = True
-        elif framerate == "59.94":
-            self._int_framerate = 60
-            self.drop_frame = not self.force_non_drop_frame
-            self._ntsc_framerate = True
-        elif framerate == "119.88":
-            self._int_framerate = 120
-            self.drop_frame = not self.force_non_drop_frame
-            self._ntsc_framerate = True
-        elif any(map(lambda x: framerate.startswith(x), ["23.976", "23.98"])):  # type: ignore
-            self._int_framerate = 24
-            self._ntsc_framerate = True
-        elif framerate in ["ms", "1000"]:
+        # Handle special cases first
+        if framerate in ["ms", "1000"]:
             self._int_framerate = 1000
             self.ms_frame = True
             framerate = 1000
         elif framerate == "frames":
             self._int_framerate = 1
         else:
-            self._int_framerate = int(float(framerate))  # type: ignore
+            # Try to detect NTSC rates
+            try:
+                fps = float(framerate)  # type: ignore
+                is_ntsc, int_fps = self._is_ntsc_rate(fps)
+
+                if is_ntsc:
+                    self._ntsc_framerate = True
+                    self._int_framerate = int_fps
+                    # DF only for multiples of 30000/1001 (29.97, 59.94, etc.).
+                    if int_fps % 30 == 0:
+                        self.drop_frame = not self.force_non_drop_frame
+                else:
+                    # Non-NTSC rate, use integer value
+                    self._int_framerate = int(fps)
+            except (ValueError, TypeError):
+                # If conversion fails, fall back to direct integer conversion
+                self._int_framerate = int(float(framerate))  # type: ignore
 
         self._framerate = framerate  # type: ignore
 
@@ -271,7 +297,7 @@ class Timecode(object):
         if self.framerate != "frames":
             ffps = float(self.framerate)
         else:
-            ffps = float(self._int_framerate) 
+            ffps = float(self._int_framerate)
 
         if self.drop_frame:
             # Number of drop frames is 6% of framerate rounded to nearest
@@ -358,7 +384,7 @@ class Timecode(object):
 
         frs: Union[int, float] = frame_number % ifps
         if self.fraction_frame:
-            frs = round(frs / float(ifps), 3) 
+            frs = round(frs / float(ifps), 3)
 
         secs = int((frame_number // ifps) % 60)
         mins = int(((frame_number // ifps) // 60) % 60)
@@ -405,7 +431,7 @@ class Timecode(object):
         For NTSC rates, the video system time is not the wall-clock one.
 
         Args:
-            as_float (bool): Return the time as a float number of seconds. 
+            as_float (bool): Return the time as a float number of seconds.
 
         Returns:
             str: The "system time" timestamp of the Timecode.
@@ -447,7 +473,7 @@ class Timecode(object):
         if self.ms_frame:
             return ts_float-(1e-3) if as_float else str(self)
 
-        # "int_framerate" frames is one second in NTSC time 
+        # "int_framerate" frames is one second in NTSC time
         if self._ntsc_framerate:
             ts_float *= 1.001
         if as_float:
@@ -598,7 +624,7 @@ class Timecode(object):
             return self.__eq__(new_tc)
         elif isinstance(other, int):
             return self.frames == other
-        else: 
+        else:
             return False
 
     def __ge__(self, other: Union[int, str, "Timecode", object]) -> bool:

@@ -247,6 +247,12 @@ def test_timecode_properties_test(args, kwargs, hrs, mins, secs, frs, str_repr):
         [["59.94", "13:36:59;59"], {}, None, None, "13:37:00;04"],
         [["59.94", "13:39:59;59"], {}, None, None, "13:40:00;00"],
         [["29.97", "13:39:59;29"], {}, None, None, "13:40:00;00"],
+        [["89.91", "00:00:00;00"], {}, 1, None, None],
+        [["89.91", "00:00:00;89"], {}, 90, None, None],
+        [["89.91", "00:00:01;00"], {}, 91, None, None],
+        [["89.91", "00:01:00;00"], {}, 5395, "00:00:59;84", None],
+        [["89.91", "13:36:59;89"], {}, None, None, "13:37:00;06"],
+        [["89.91", "13:39:59;89"], {}, None, None, "13:40:00;00"],
         [["119.88", "00:00:00;00"], {}, 1, None, None],
         [["119.88", "00:00:00;119"], {}, 120, None, None],
         [["119.88", "00:00:01;00"], {}, 121, None, None],
@@ -270,10 +276,10 @@ def test_ntsc_drop_frame_conversion(args, kwargs, frames, str_repr, tc_next):
 
 
 @pytest.mark.parametrize(
-    "framerate", ["29.97", "59.94", "119.88"]
+    "framerate", ["29.97", "59.94", "89.91", "119.88"]
 )
 def test_setting_ntsc_frame_rate_forces_drop_frame(framerate):
-    """Setting NTSC frame rates forces the dropframe to True."""
+    """Setting NTSC drop frame rates forces the dropframe to True."""
     tc = Timecode(framerate)
     assert tc.drop_frame
 
@@ -345,7 +351,6 @@ def test_iteration(args, kwargs, str_repr, next_range, last_tc_str_repr, frames)
         [["119.88", "03:36:09;23"],{}, ["119.88", "00:00:29;23"],{},    3504, 3504, "03:36:38;47", "03:36:38;47", 1558248, 1558248],
         [["23.98", "03:36:09:23"], {}, ["23.98", "00:00:29:23"], {},     720,  720, "03:36:39:23", "03:36:39:23", 312000, 312000],
         [["ms", "03:36:09.230"],   {}, ["ms", "01:06:09.230"],   {}, 3969231,  720, "04:42:18.461", "03:36:09.950", 16938462, 12969951],
-        [["ms", "03:36:09.230"],   {}, ["ms", "01:06:09.230"],   {}, 3969231,  720, "04:42:18.461", "03:36:09.950", 16938462, 12969951],
         [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485, 719, "00:08:40:04", "00:08:49:22", 12485, 12719],
         [["59.94", "04:20:13;21"], {}, ["59.94", "23:59:59;59"], {}, 5178816, 0, "04:20:13;21", "04:20:13;21", 6114682, 935866],
     ]
@@ -409,7 +414,6 @@ def test_op_overloads_subtract(args1, kwargs1, args2, kwargs2, custom_offset1, c
         [["120", "03:36:09:23"], {}, ["120", "00:00:29:23"], {}, 3504, 3504, "23:21:16:95", "23:21:16:95", 5453289216, 5453289216],
         [["119.88", "03:36:09;23"], {}, ["119.88", "00:00:29;23"], {}, 3504, 3504, "23:19:28;95", "23:19:28;95", 5447822976, 5447822976],
         [["ms", "03:36:09.230"], {}, ["ms", "01:06:09.230"], {}, 3969231,  3969231, "17:22:11.360", "17:22:11.360", 51477873731361, 51477873731361],
-        [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485,  485, "19:21:39:23", "19:21:39:23", 5820000, 5820000],
         [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485,  485, "19:21:39:23", "19:21:39:23", 5820000, 5820000],
     ]
 )
@@ -509,6 +513,7 @@ def test_div_method_working_properly_2():
         [["59.94", "00:01:00;00"], 3597, 3596],
         [["60", "00:01:00:00"], 3601, 3600],
         [["72", "00:01:00:00"], 4321, 4320],
+        [["89.91", "00:01:00;00"], 5395, 5394],
         [["96", "00:01:00:00"], 5761, 5760],
         [["100", "00:01:00:00"], 6001, 6000],
         [["120", "00:01:00:00"], 7201, 7200],
@@ -1087,6 +1092,8 @@ def test_rollover_for_23_98():
         [["59.94"], {"frames": 5184001, "force_non_drop_frame": True}, "00:00:00:00"],
         [["72"], {"frames": 6220800}, "23:59:59:71"],
         [["72"], {"frames": 6220801}, "00:00:00:00"],
+        [["89.91"], {"frames": 7768224}, "23:59:59;89"],
+        [["89.91"], {"frames": 7768225}, "00:00:00;00"],
         [["96"], {"frames": 8294400}, "23:59:59:95"],
         [["96"], {"frames": 8294401}, "00:00:00:00"],
         [["100"], {"frames": 8640000}, "23:59:59:99"],
@@ -1100,3 +1107,54 @@ def test_rollover_for_23_98():
 def test_rollover(args, kwargs, str_repr):
     tc = Timecode(*args, **kwargs)
     assert str_repr == tc.__str__()
+
+
+@pytest.mark.parametrize(
+    "framerate,int_framerate,is_drop,one_minute_frames,expected_tc", [
+        # Non-drop NTSC rates (multiples of 24000/1001)
+        ["47.952", 48, False, 2881, "00:01:00:00"],   # 2 * 23.976 fps - HFR broadcast
+        ["71.928", 72, False, 4321, "00:01:00:00"],   # 3 * 23.976 fps
+        ["95.904", 96, False, 5761, "00:01:00:00"],   # 4 * 23.976 fps
+        # Drop frame NTSC rate (multiple of 30000/1001)
+        # For drop frame, test at 10-minute mark where frames aren't skipped
+        ["89.91", 90, True, 53947, "00:10:00;00"],    # 3 * 29.97 fps - with drop frame
+    ]
+)
+def test_generalized_ntsc_rates(framerate, int_framerate, is_drop, one_minute_frames, expected_tc):
+    """Test generalized NTSC detection for HFR rates.
+
+    Tests automatic NTSC detection for rates based on multiples of 24000/1001 or 30000/1001.
+    Drop frame should only apply to multiples of 30000/1001 (i.e., int_framerate % 30 == 0).
+    """
+    # Test basic creation and NTSC detection
+    separator = ";" if is_drop else ":"
+    tc = Timecode(framerate, f"00:00:00{separator}00")
+    assert tc._ntsc_framerate is True
+    assert tc._int_framerate == int_framerate
+    assert tc.drop_frame is is_drop
+    assert tc.framerate == framerate
+
+    # Test frame counting - one second should be int_framerate + 1
+    tc2 = Timecode(framerate, f"00:00:01{separator}00")
+    assert tc2.frames == int_framerate + 1
+
+    # Test frame count displays correctly
+    tc3 = Timecode(framerate, frames=one_minute_frames)
+    assert str(tc3) == expected_tc
+
+
+@pytest.mark.parametrize(
+    "rational_str,int_framerate,is_drop", [
+        ["48000/1001", 48, False],   # 47.952 fps
+        ["72000/1001", 72, False],   # 71.928 fps
+        ["90000/1001", 90, True],    # 89.91 fps - drop frame
+        ["96000/1001", 96, False],   # 95.904 fps
+    ]
+)
+def test_generalized_ntsc_rational_formats(rational_str, int_framerate, is_drop):
+    """Test that rational format fractions work for new NTSC rates."""
+    separator = ";" if is_drop else ":"
+    tc = Timecode(rational_str, f"00:00:00{separator}00")
+    assert tc._ntsc_framerate is True
+    assert tc._int_framerate == int_framerate
+    assert tc.drop_frame is is_drop
