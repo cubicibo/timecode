@@ -709,12 +709,6 @@ def test_ms_vs_fraction_frames_2():
 def test_ms_vs_fraction_frames_3():
     tc1 = Timecode("ms", "00:00:00.040")
     tc2 = Timecode(24, "00:00:00.042")
-    assert tc1 != tc2
-
-
-def test_ms_vs_fraction_frames_4():
-    tc1 = Timecode("ms", "00:00:00.040")
-    tc2 = Timecode(24, "00:00:00.042")
     assert tc1.frame_number == 40
     assert tc2.frame_number == 1
 
