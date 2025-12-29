@@ -1,3 +1,8 @@
+![license](https://img.shields.io/pypi/l/timecode.svg)
+![pyversion](https://img.shields.io/pypi/pyversions/timecode.svg)
+![pypiversion](https://img.shields.io/pypi/v/timecode.svg)
+![wheel](https://img.shields.io/pypi/wheel/timecode.svg)
+
 About
 -----
 
