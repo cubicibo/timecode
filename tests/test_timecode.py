@@ -1,7 +1,7 @@
 #!-*- coding: utf-8 -*-
 import pytest
 
-from timecode.timecode import Timecode, TimecodeError
+from timecode import Timecode, TimecodeError
 
 
 @pytest.mark.parametrize(
