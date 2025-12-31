@@ -3,6 +3,7 @@
 # Standard Library Imports
 from __future__ import annotations
 
+import math
 import sys
 from contextlib import suppress
 from typing import TYPE_CHECKING, overload
@@ -888,7 +889,6 @@ class Timecode:
         Returns:
             float: The seconds as float.
         """
-        import math
         time_value = float(self.frames) / float(self._int_framerate)
         return math.nextafter(time_value, math.inf)
 
