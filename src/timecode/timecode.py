@@ -4,22 +4,21 @@
 from __future__ import annotations
 
 import math
-import sys
 from contextlib import suppress
 from typing import TYPE_CHECKING, overload
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 with suppress(ImportError):
     from typing import Literal
 
 
 if TYPE_CHECKING:
+    import sys
     from collections.abc import Iterator
     from fractions import Fraction
+    if sys.version_info >= (3, 11):
+        from typing import Self
+    else:
+        from typing_extensions import Self
 
 
 class Timecode:
